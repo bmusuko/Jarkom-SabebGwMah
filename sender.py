@@ -2,8 +2,8 @@ import socket
 import sys
 
 host_address = sys.argv[1]
-port = sys.argv[2]
-file_address = []
+port = int(sys.argv[2])
+file_path = []
 
 i = 2
 
@@ -15,16 +15,27 @@ if (len(sys.argv) > 8) :
 
 while i < len(sys.argv) - 1 :
     i += 1
-    file_address.append(sys.argv[i])
+    file_path.append(sys.argv[i])
 
-# UDP_IP = "127.0.0.1"
-# UDP_PORT = 8000
-# MESSAGE = "Hello, World!"
+#print (host_address)
+#print (port)
+#print (file_path)
 
-# print "UDP target IP:", UDP_IP
-# print "UDP target port:", UDP_PORT
-# print "message:", MESSAGE
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect((host_address, port))
+print("[+] Connected with Server")
 
-# sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
+# get file name to send
+f_send = file_path[0]
+# open file
+with open(f_send, "rb") as f:
+    # send file
+    print("[+] Sending file...")
+    data = f.read()
+    print(data)
+    s.sendall(data)
 
-# sock.sendto(MESSAGE, (UDP_IP, UDP_PORT))
+    # close connection
+    s.close()
+    print("[-] Disconnected")
+    sys.exit(0)
