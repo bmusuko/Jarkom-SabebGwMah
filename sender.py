@@ -17,10 +17,6 @@ while i < len(sys.argv) - 1 :
     i += 1
     file_path.append(sys.argv[i])
 
-#print (host_address)
-#print (port)
-#print (file_path)
-
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((host_address, port))
 print("[+] Connected with Server")
@@ -32,7 +28,7 @@ with open(f_send, "rb") as f:
     # send file
     print("[+] Sending file...")
     data = f.read()
-    print(data)
+    # print(data)
     s.sendall(data)
 
     # close connection
