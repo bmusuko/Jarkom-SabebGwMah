@@ -1,9 +1,15 @@
 import socket
 import sys
+import time
+import threading
+
+file = b''
+counter_file = 0
+counter_sequence_number = -1
 
 
 
-HOST = "192.168.88.7"
+HOST = "192.168.43.32"
 if(len(sys.argv)<2):
     sys.exit("argument not sufficient")
 PORT = int(sys.argv[1])
@@ -14,24 +20,44 @@ s.listen()
 
 print("Listening ...")
 while True:
-    conn, addr = s.accept()
+    print("tete")
+    client_socket, addr = s.accept()
     print("[+] Client connected: ", addr)
-    #print(data.strip(),addr)
-    #print(repr(data))
-
-    # get file name to download
-    f = open("data_received", "wb")
     while True:
-        # get file bytes
-        data = conn.recv(3276800)
-        if not data:
+        request = client_socket.recv(32775)
+        if request == b'':
+            print("1")
+            client_socket.close()
             break
-        # write bytes on file
-        f.write(data)
-    f.close()
-    print("[+] Download complete!")
+        type_packet = request[0] >> 4
+        id_packet = request[0] % 16
+        sequence_number = (request[1] << 8) + request[2]
+        length = (request[3] << 8) + request[4]
+        checksum = (request[5] << 8) + request[6]
+        file += request[7:]
+        counter_sequence_number += 1
+        print("type packet : "+str(type_packet))
+        print("id packet : "+ str(id_packet))
+        print("sequence_number : " +str(sequence_number))
+        print("length : " +str(length))
+        print("checksum : "+str(checksum))
+        if(type_packet == 0x2):
+            f = open("output_"+str(id_packet)+".jpg", "wb")
+            print("2")
+            f.write(file)
+            f.close()
+            file = b''
+            client_socket.send(b'\x03')
+            print("[-] Client disconnected")
+            sys.exit(0)
+        elif(type_packet == 0x00):
+            print("3")
+            client_socket.send(b'\x01')
+        else:
+            print("4")
+            client_socket.send(b'\xff')
+        client_socket.close()
+        break
 
-    # close connection
-    conn.close()
-    print("[-] Client disconnected")
-    sys.exit(0)
+sys.exit(0)
+print("[-] Client disconnected")
