@@ -3,10 +3,16 @@ import sys
 import time
 import threading
 
-file = b''
-counter_file = 0
-counter_sequence_number = 0
+files =[b'',b'',b'',b'',b'']
+counter_sequence_number = [0,0,0,0,0]
 
+# def intToByteObject16Bits(value):
+#     x = value
+#     y = 0
+#     if (x >= 256):
+#         y = x >> 8
+#         x = x % 256
+#     return bytes([y]) + bytes([x])
 
 def checksum(x):
     n = len(x)
@@ -33,12 +39,11 @@ s.listen()
 
 print("Listening ...")
 while True:
-    print("tete")
     client_socket, addr = s.accept()
     print("[+] Client connected: ", addr)
     while True:
         request =None
-        request = client_socket.recv(33000)
+        request = client_socket.recv(32999)
         if request == b'':
             print("packet kosong")
             client_socket.close()
@@ -49,35 +54,34 @@ while True:
         sequence_number = (request[1] << 8) + request[2] 
         length = (request[3] << 8) + request[4]
         checksums = (request[5] << 8) + request[6]
-        if ((checksums) == checksum (request[0:5]+(request[7:length+7])) and sequence_number==counter_sequence_number):
-            print("[+] Packet - "+str(sequence_number+1)+" Received")
-            print("type packet : "+str(type_packet))
-            print("id packet : "+ str(id_packet))
-            print("sequence_number : " +str(sequence_number+1))
-            print("length : " +str(length))
-            print("checksum : "+str(checksums))
-            file += request[7:length+7]
+        if ((checksums) == checksum (request[0:5]+(request[7:length+7]))):
+            if(sequence_number==counter_sequence_number[id_packet]): 
+                print("[+] Packet - "+str(sequence_number+1)+" Received")
+                print("type packet : "+str(type_packet))
+                print("id packet : "+ str(id_packet))
+                print("sequence_number : " +str(sequence_number+1))
+                print("length : " +str(length))
+                print("checksum : "+str(checksums))
+                files[id_packet] += request[7:length+7]
 
-            if(type_packet == 0x2):
-                #print(request[(length+7):(length+7)+4])
-                client_socket.send(b'\x03')
-                extension = request[(length+7):(length+11)].decode()
-                print(extension)
-                f = open("output_"+str(id_packet)+extension, "wb")
-                print(id_packet)
-                print("FIN ACK")
-                f.write(file)
-                f.close()
-                file = b''
-                print("[-] Client disconnected")
-                sys.exit(0)
-            elif(type_packet == 0x00):
-                client_socket.send(b'\x01')
-                counter_sequence_number += 1
-                print("ACK BIASA")
-            else:
-                client_socket.send(b'\xff')
-                print("UNIDENTIFIED")
+                if(type_packet == 0x2):
+                    #print(request[(length+7):(length+7)+4])
+                    ack  = (b'\x03')
+                    extension = request[(length+7):(length+11)].decode()
+                    counter_sequence_number[id_packet] += 1
+                    f = open("output_"+str(id_packet)+extension, "wb")
+                    print(id_packet)
+                    print("FIN ACK")
+                    f.write(files[id_packet])
+                    f.close()
+                elif(type_packet == 0x00):
+                    ack = b'\x01'
+                    counter_sequence_number[id_packet] += 1
+                    print("ACK BIASA")
+                else:
+                    ack =b'\xff'
+                    print("UNIDENTIFIED")
+                client_socket.send(ack)
         else:
             print("checksum salah")
             client_socket.send(b'\xaa')
