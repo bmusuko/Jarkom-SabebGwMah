@@ -1,57 +1,76 @@
-import binascii
+ 
+import socket
 import sys
+import time
+import threading
 
-class packet(object):
-    def __init__(self, TYPE=0, ID=0, SEQUENCE_NUMBER=0, LENGTH = 0, CHECKSUM=0, DATA=bytearray(), parse_bytes=0, parsed_data = 0):
-        if (parse_bytes == 0):
-            self.TYPE = TYPE
-            self.ID = ID
-            self.SEQUENCE_NUMBER = SEQUENCE_NUMBER
-            self.LENGTH = LENGTH
-            self.CHECKSUM = CHECKSUM
-            self.DATA = DATA
+files =[b'',b'',b'',b'',b'']
+counter_sequence_number = [0,0,0,0,0]
 
-    def parsing(self):
-        result = bytearray(7)
+def checksum(x):
+    n = len(x)
+    if n%2 == 1:
+        x += bytes([0])
+        n +=1
+    s = 0
+    t = n // 2
+    for i in range (t):
+        y = 2*i
+        s ^= (x[y]<<8 + x[y+1])
+    return s%65536
 
-        result[0] = self.TYPE + self.DATA*16
-        result[1] = self.SEQUENCE_NUMBER // 256
-        result[2] = self.SEQUENCE_NUMBER % 256
-        result[3] = self.LENGTH // 256
-        result[4] = self.LENGTH % 256
-        result[5] = self.CHECKSUM // 256
-        result[6] = self.CHECKSUM % 256
-        result += self.DATA
+HOST = "192.168.43.32"
+if(len(sys.argv)<2):
+    sys.exit("argument not sufficient")
+PORT = int(sys.argv[1])
 
-        return bytes(result)
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.bind((HOST, PORT))
+s.listen()
+print("Listening ...")
 
-    def paket(self, parsed_data, ID, SEQUENCE_NUMBER, TYPE):
-        self.TYPE = TYPE
-        self.ID = ID
-        self.SEQUENCE_NUMBER = SEQUENCE_NUMBER
-        self.LENGTH = len(parsed_data)
-        self.DATA = parsed_data
-        self.CHECKSUM = 0
+client_socket, addr = s.accept()
+print("[+] Client connected: ", addr)
+while True:
+    request =None
+    request = client_socket.recv(32999)
+    if request == b'':
+        print("packet kosong")
+        client_socket.close()
+        print("[-] Client disconnected")
+        sys.exit(0)
 
-        list_nilai = []
+    type_packet = (request[0] >> 4)%16
+    id_packet = request[0] % 16
+    sequence_number = (request[1] << 8) + request[2] 
+    length = (request[3] << 8) + request[4]
+    checksums = (request[5] << 8) + request[6]
+    if ((checksums) == checksum (request[0:5]+(request[7:length+7]))):
+        if(sequence_number==counter_sequence_number[id_packet]): 
+            print("[+] Packet - "+str(sequence_number+1)+" Received")
+            print("type packet : "+str(type_packet))
+            print("id packet : "+ str(id_packet))
+            print("sequence_number : " +str(sequence_number+1))
+            print("length : " +str(length))
+            print("checksum : "+str(checksums))
+            files[id_packet] += request[7:length+7]
 
-        cek = bytearray(self.parsing())
-        n = 0
-        LENGTH = len(cek)
-        s = 0
+            if(type_packet == 0x2):
+                #print(request[(length+7):(length+7)+4])
+                extension = request[(length+7):(length+11)].decode()
+                counter_sequence_number[id_packet] += 1
+                f = open("output_"+str(id_packet)+extension, "wb")
+                print(id_packet)
+                print("FIN ACK")
+                f.write(files[id_packet])
+                f.close()
+                client_socket.send(b'\x03')
+            elif(type_packet == 0x00):
+                counter_sequence_number[id_packet] += 1
+                print("ACK BIASA")
+                client_socket.send(b'\x01')
+            else:
+                print("UNIDENTIFIED")
+    else:
+        print("checksum salah")
 
-        for x in cek:
-            list_nilai.append(x)
-
-        # print(list_nilai)
-        # list_nilai =[x for x in cek]
-        LENGTH = len(list_nilai)//2
-        b = len(list_nilai)%2
-
-        while (n < LENGTH):
-            s ^= (list_nilai[n*2]*256 + list_nilai[n*2+1])
-            n+=1
-        if (b > 0):
-            s ^=  list_nilai[n*2]
-        
-        self.CHECKSUM = s
